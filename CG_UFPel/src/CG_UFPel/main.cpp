@@ -14,9 +14,6 @@
 
 #include <cmath>
 
-// STRUCT PONTO PARA BEZIER
-typedef struct { float x, y, z; } point;
-
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
@@ -25,6 +22,7 @@ void processInput(GLFWwindow *window);
 // funções
 void escala(glm::mat4 model, int flag);
 void translacao(glm::mat4 model, float x, float y, float z);
+void bezier(glm::mat4 model, glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, float t);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -43,11 +41,16 @@ float lastFrame = 0.0f;
 // MODELO
 // escala inicial 0.15
 float gscale = 0.10f;
-// coordenadas iniciais 0.0f, -1.75f, 0.0f
-float gx = 0.0f, gy = -1.75f, gz = 0.0f;
+// coordenadas iniciais 0.0f, -1.0f, 0.0f
+float gx = 0.0f, gy = -1.0f, gz = 0.0f;
 
-// PONTOS BEZIER QUADRÁTICO
-point p0, p1, p2;
+// PONTOS BEZIER CÚBICO
+glm::vec3 gp0 = glm::vec3(0.0f, 0.0f, 0.0f), 
+			gp1 = glm::vec3(0.5f, 0.5f, 0.0f),
+			gp2 = glm::vec3(1.5f, 1.75f, 0.0f),
+			gp3 = glm::vec3(3.0f, 3.0f, 0.0f);
+
+float gt = 0.0f, gtime = 0.0f;
 
 int main()
 {
@@ -158,6 +161,18 @@ int main()
 			translacao(model, 0.01, 0.0, 0.0);
 		}
 		// BEZIER
+		if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS) {
+			gtime = glfwGetTime();
+			gtime = gtime - currentFrame;
+
+			while (gtime <= 10.0) {
+				bezier(model, gp0, gp1, gp2, gp3, gtime * 0.1f);
+
+				gtime = glfwGetTime();
+				gtime = gtime - currentFrame;
+			}
+		}
+
 
         ourShader.setMat4("model", model);
         ourModel.Draw(ourShader);
@@ -176,8 +191,26 @@ int main()
 }
 
 // bezier
-void bezier(glm::mat4 model) {
-	
+void bezier(glm::mat4 model, glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, float t) {
+	float x, y;
+
+	printf("t: %f\n", t);
+
+	x = pow(1 - t, 3) * p0.x +
+		pow(1 - t, 2) * 3 * t * p1.x +
+		(1 - t) * 3 * t * t * p2.x +
+		t * t * t * p3.x;
+
+	printf("x: %f\n", x);
+
+	y = pow(1 - t, 3) * p0.y +
+		pow(1 - t, 2) * 3 * t * p1.y +
+		(1 - t) * 3 * t * t * p2.y +
+		t * t * t * p3.y;
+
+	printf("y: %f\n", y);
+
+	model = glm::translate(model, glm::vec3(x, y, gz));
 }
 
 // translacao linear
