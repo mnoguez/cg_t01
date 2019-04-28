@@ -16,6 +16,8 @@
 
 #define N_MODELOS 3
 #define N_CAMERAS 2
+#define N_PASSOS_MODELO 4
+#define N_PASSOS_CAMERA 4
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
@@ -28,6 +30,7 @@ void translacao(Shader s, Model m, GLFWwindow* window, float tempo);
 void bezier(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p0, glm::vec3 p1, glm::vec3 p2);
 void rotacao(Shader s, Model m, GLFWwindow* window, float tempo);
 void rotacaoPonto(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p);
+void animacao(Shader s, Model m, GLFWwindow* window, float tempo);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -112,23 +115,18 @@ int main()
         currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
-
         // input
         processInput(ourShader, ourModel, window);
-
         // render
         glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
         // don't forget to enable shader before setting uniforms
         ourShader.use();
-
         // view/projection transformations
         glm::mat4 projection = glm::perspective(glm::radians(camera[cameraAtual].Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = camera[cameraAtual].GetViewMatrix();
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", view);
-
 		// render the loaded model
 		for (int i = 0; i < N_MODELOS; i++) {
 			glm::mat4 model;
@@ -138,30 +136,55 @@ int main()
 			ourShader.setMat4("model", model);
 			ourModel.Draw(ourShader);
 		}
-
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
-
     // glfw: terminate, clearing all previously allocated GLFW resources.
     // ------------------------------------------------------------------
     glfwTerminate();
     return 0;
 }
 
+void animacao(Shader s, Model m, GLFWwindow* window, float tempo) {
+	// per-frame time logic
+	int passosRestantes = N_PASSOS_MODELO;
+	float inicio[N_PASSOS_MODELO] = { 0.0f, 0.0f, 0.0f, 0.0f };
+	currentFrame = glfwGetTime();
+	inicio[0] = currentFrame;
+	glm::vec3 pInicial = pAtuais[modeloAtual];
+
+	// 1
+	inicio[0] = tempo - (glfwGetTime() - inicio[0]);
+	printf("tempo: %f passos restantes: %d\n", inicio[0], passosRestantes);
+	translacao(s, m, window, (float)(inicio[0] / passosRestantes));
+	passosRestantes--;
+	// 2
+	inicio[1] = tempo - (glfwGetTime() - inicio[0]);
+	printf("tempo: %f %f %f\n", tempo, glfwGetTime(), inicio[0]);
+	printf("tempo: %f passos restantes: %d\n", inicio[1], passosRestantes);
+	bezier(s, m, window, (float)(inicio[1] / passosRestantes), pInicial, glm::vec3(1.0f, 0.5f, 0.0f), glm::vec3(1.5f, 1.5f, 0.0f));
+	passosRestantes--;
+	// 3
+	inicio[2] = tempo - (glfwGetTime() - inicio[0]);
+	printf("tempo: %f %f %f\n", tempo, glfwGetTime(), inicio[0]);
+	printf("tempo: %f passos restantes: %d\n", inicio[2], passosRestantes);
+	rotacao(s, m, window, (float)(inicio[2] / passosRestantes));
+	passosRestantes--;
+	// 4
+	inicio[3] = tempo - (glfwGetTime() - inicio[0]);
+	printf("tempo: %f %f %f\n", tempo, glfwGetTime(), inicio[0]);
+	printf("tempo: %f passos restantes: %d\n", inicio[3], passosRestantes);
+	translacao(s, m, window, (float)(inicio[3] / passosRestantes));	
+}
+
 // rotacao
-void rotacaoPonto(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p) 
-{
+void rotacaoPonto(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p) {
 	// per-frame time logic
 	float inicio = glfwGetTime();
 	currentFrame = glfwGetTime();
 	deltaTime = currentFrame - inicio;
-	glm::vec3 pInicial = pAtuais[modeloAtual];
-
-	// 5s = 360º
-	// delta = x
 
 	float angulo;
 
@@ -203,16 +226,11 @@ void rotacaoPonto(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 
 }
 
 // rotacao
-void rotacao(Shader s, Model m, GLFWwindow* window, float tempo) 
-{
+void rotacao(Shader s, Model m, GLFWwindow* window, float tempo) {
 	// per-frame time logic
 	float inicio = glfwGetTime();
 	currentFrame = glfwGetTime();
 	deltaTime = currentFrame - inicio;
-	glm::vec3 pInicial = pAtuais[modeloAtual];
-
-	// 5s = 360º
-	// delta = x
 
 	float angulo;
 
@@ -251,8 +269,7 @@ void rotacao(Shader s, Model m, GLFWwindow* window, float tempo)
 }
 
 // bezier
-void bezier(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p0, glm::vec3 p1, glm::vec3 p2) 
-{
+void bezier(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p0, glm::vec3 p1, glm::vec3 p2) {
 	float inicio = glfwGetTime();
 	currentFrame = glfwGetTime();
 	deltaTime = currentFrame - inicio;
@@ -264,16 +281,16 @@ void bezier(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p0, gl
 
 		s.use();
 
-		//printf("t: %f\n", t);
+		printf("t: %f\n", t);
 		pAtuais[modeloAtual].x = pow(1 - t, 2) * p0.x +
 			(1 - t) * 2 * t * p1.x +
 			t * t * p2.x;
-		//printf("x: %f\n", pAtuais[modeloAtual].x);
+		printf("x: %f\n", pAtuais[modeloAtual].x);
 
 		pAtuais[modeloAtual].y = pow(1 - t, 2) * p0.y +
 			(1 - t) * 2 * t * p1.y +
 			t * t * p2.y;
-		//printf("y: %f\n", pAtuais[modeloAtual].y);
+		printf("y: %f\n", pAtuais[modeloAtual].y);
 
 		for (int i = 0; i < N_MODELOS; i++) {
 			glm::mat4 model;
@@ -294,8 +311,7 @@ void bezier(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p0, gl
 }
 
 // translacao linear
-void translacao(Shader s, Model m, GLFWwindow* window, float tempo) 
-{
+void translacao(Shader s, Model m, GLFWwindow* window, float tempo) {
 	// per-frame time logic
 	float inicio = glfwGetTime();
 	currentFrame = glfwGetTime();
@@ -332,8 +348,7 @@ void translacao(Shader s, Model m, GLFWwindow* window, float tempo)
 }
 
 // escala
-void escala(Shader s, Model m, GLFWwindow* window, float tempo) 
-{
+void escala(Shader s, Model m, GLFWwindow* window, float tempo) {
 	// per-frame time logic
 	float inicio = glfwGetTime();
 	currentFrame = glfwGetTime();
@@ -375,13 +390,13 @@ void processInput(Shader s, Model m, GLFWwindow *window)
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+    if (glfwGetKey(window, GLFW_KEY_KP_8) == GLFW_PRESS)
 		camera[cameraAtual].ProcessKeyboard(FORWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+    if (glfwGetKey(window, GLFW_KEY_KP_2) == GLFW_PRESS)
 		camera[cameraAtual].ProcessKeyboard(BACKWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+    if (glfwGetKey(window, GLFW_KEY_KP_4) == GLFW_PRESS)
 		camera[cameraAtual].ProcessKeyboard(LEFT, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+    if (glfwGetKey(window, GLFW_KEY_KP_6) == GLFW_PRESS)
 		camera[cameraAtual].ProcessKeyboard(RIGHT, deltaTime);
 	// TROCA MODELOS
 	if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) {
@@ -393,10 +408,13 @@ void processInput(Shader s, Model m, GLFWwindow *window)
 		cameraAtual = (int)((cameraAtual + 1) % N_CAMERAS);
 		Sleep(500.0f);
 	}
+	// ANIMAÇÃO
+	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+		animacao(s, m, window, 10.0f);
 	// ESCALA
 	if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
 		escala(s, m, window, 1.0f);
-	// TRANSLAÇÂO LINEAR EIXO X
+	// TRANSLAÇÃO LINEAR EIXO X
 	if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS)
 		translacao(s, m, window, 5.0f);
 	// BEZIER QUADRÁTICO
