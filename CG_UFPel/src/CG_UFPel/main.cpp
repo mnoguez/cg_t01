@@ -15,11 +15,12 @@
 #include <cmath>
 
 #define N_MODELOS 3
+#define N_CAMERAS 2
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
-void processInput(GLFWwindow *window);
+void processInput(Shader s, Model m, GLFWwindow *window);
 
 // funções
 void escala(Shader s, Model m, GLFWwindow* window, float tempo);
@@ -33,7 +34,8 @@ const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
 // camera
-Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+int cameraAtual = 0;
+Camera camera[N_CAMERAS] = { glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.75f, 0.25f, 5.0f) };
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -47,7 +49,7 @@ float lastFrame = 0.0f;
 int modeloAtual = 0;
 // escala inicial 0.05
 glm::vec3 escalas[N_MODELOS] = { glm::vec3(0.05f), glm::vec3(0.05f), glm::vec3(0.05f) };
-glm::vec3 pAtuais[N_MODELOS] = { glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.5f, -1.0f, 0.0f), glm::vec3(-0.5f, -1.0f, 0.0f) };
+glm::vec3 pAtuais[N_MODELOS] = { glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.5f, 0.0f, 0.0f), glm::vec3(-0.5f, 0.0f, 0.0f) };
 
 int main()
 {
@@ -112,7 +114,7 @@ int main()
         lastFrame = currentFrame;
 
         // input
-        processInput(window);
+        processInput(ourShader, ourModel, window);
 
         // render
         glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
@@ -122,8 +124,8 @@ int main()
         ourShader.use();
 
         // view/projection transformations
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-        glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 projection = glm::perspective(glm::radians(camera[cameraAtual].Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        glm::mat4 view = camera[cameraAtual].GetViewMatrix();
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", view);
 
@@ -135,32 +137,6 @@ int main()
 
 			ourShader.setMat4("model", model);
 			ourModel.Draw(ourShader);
-		}
-
-		// TROCA MODELOS
-		if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) {
-			modeloAtual = (int) ((modeloAtual + 1) % N_MODELOS);
-			Sleep(500.0f);
-		}
-		// ESCALA
-		if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) {
-			escala(ourShader, ourModel, window, 1.0f);
-		}
-		// TRANSLAÇÂO LINEAR EIXO X
-		if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS) {
-			translacao(ourShader, ourModel, window, 5.0f);
-		}
-		// BEZIER QUADRÁTICO
-		if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS) {
-			bezier(ourShader, ourModel, window, 5.0f, pAtuais[modeloAtual], glm::vec3(1.0f, 0.5f, 0.0f), glm::vec3(1.5f, 1.5f, 0.0f));
-		}
-		// ROTAÇÃO
-		if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) {
-			rotacao(ourShader, ourModel, window, 5.0f);
-		}
-		// ROTAÇÃO NUM PONTO
-		if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS) {
-			rotacaoPonto(ourShader, ourModel, window, 10.0f, glm::vec3(0.25f, 0.0f, 0.0f));
 		}
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
@@ -176,7 +152,8 @@ int main()
 }
 
 // rotacao
-void rotacaoPonto(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p) {
+void rotacaoPonto(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p) 
+{
 	// per-frame time logic
 	float inicio = glfwGetTime();
 	currentFrame = glfwGetTime();
@@ -226,7 +203,8 @@ void rotacaoPonto(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 
 }
 
 // rotacao
-void rotacao(Shader s, Model m, GLFWwindow* window, float tempo) {
+void rotacao(Shader s, Model m, GLFWwindow* window, float tempo) 
+{
 	// per-frame time logic
 	float inicio = glfwGetTime();
 	currentFrame = glfwGetTime();
@@ -273,7 +251,8 @@ void rotacao(Shader s, Model m, GLFWwindow* window, float tempo) {
 }
 
 // bezier
-void bezier(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p0, glm::vec3 p1, glm::vec3 p2) {
+void bezier(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p0, glm::vec3 p1, glm::vec3 p2) 
+{
 	float inicio = glfwGetTime();
 	currentFrame = glfwGetTime();
 	deltaTime = currentFrame - inicio;
@@ -315,7 +294,8 @@ void bezier(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p0, gl
 }
 
 // translacao linear
-void translacao(Shader s, Model m, GLFWwindow* window, float tempo) {
+void translacao(Shader s, Model m, GLFWwindow* window, float tempo) 
+{
 	// per-frame time logic
 	float inicio = glfwGetTime();
 	currentFrame = glfwGetTime();
@@ -352,7 +332,8 @@ void translacao(Shader s, Model m, GLFWwindow* window, float tempo) {
 }
 
 // escala
-void escala(Shader s, Model m, GLFWwindow* window, float tempo) {
+void escala(Shader s, Model m, GLFWwindow* window, float tempo) 
+{
 	// per-frame time logic
 	float inicio = glfwGetTime();
 	currentFrame = glfwGetTime();
@@ -389,19 +370,44 @@ void escala(Shader s, Model m, GLFWwindow* window, float tempo) {
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
-void processInput(GLFWwindow *window)
+void processInput(Shader s, Model m, GLFWwindow *window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        camera.ProcessKeyboard(FORWARD, deltaTime);
+		camera[cameraAtual].ProcessKeyboard(FORWARD, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        camera.ProcessKeyboard(BACKWARD, deltaTime);
+		camera[cameraAtual].ProcessKeyboard(BACKWARD, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        camera.ProcessKeyboard(LEFT, deltaTime);
+		camera[cameraAtual].ProcessKeyboard(LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        camera.ProcessKeyboard(RIGHT, deltaTime);
+		camera[cameraAtual].ProcessKeyboard(RIGHT, deltaTime);
+	// TROCA MODELOS
+	if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) {
+		modeloAtual = (int)((modeloAtual + 1) % N_MODELOS);
+		Sleep(500.0f);
+	}
+	// TROCA CAMERAS
+	if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) {
+		cameraAtual = (int)((cameraAtual + 1) % N_CAMERAS);
+		Sleep(500.0f);
+	}
+	// ESCALA
+	if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+		escala(s, m, window, 1.0f);
+	// TRANSLAÇÂO LINEAR EIXO X
+	if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS)
+		translacao(s, m, window, 5.0f);
+	// BEZIER QUADRÁTICO
+	if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS)
+		bezier(s, m, window, 5.0f, pAtuais[modeloAtual], glm::vec3(1.0f, 0.5f, 0.0f), glm::vec3(1.5f, 1.5f, 0.0f));
+	// ROTAÇÃO
+	if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
+		rotacao(s, m, window, 5.0f);
+	// ROTAÇÃO NUM PONTO
+	if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS)
+		rotacaoPonto(s, m, window, 10.0f, glm::vec3(0.25f, 0.0f, 0.0f));
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
@@ -430,12 +436,12 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
     lastX = xpos;
     lastY = ypos;
 
-    camera.ProcessMouseMovement(xoffset, yoffset);
+	camera[cameraAtual].ProcessMouseMovement(xoffset, yoffset);
 }
 
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
 // ----------------------------------------------------------------------
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-    camera.ProcessMouseScroll(yoffset);
+	camera[cameraAtual].ProcessMouseScroll(yoffset);
 }
