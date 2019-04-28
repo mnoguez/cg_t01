@@ -20,9 +20,9 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 
 // funções
-void escala(glm::mat4 model, int flag);
-void translacao(glm::mat4 model, float x, float y, float z);
-void bezier(glm::mat4 model, glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, float t);
+void escala(Shader s, Model m, GLFWwindow* window, float tempo);
+void translacao(Shader s, Model m, GLFWwindow* window, float tempo);
+void bezier(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p0, glm::vec3 p1, glm::vec3 p2);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -35,22 +35,15 @@ float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
 
 // timing
+float currentFrame = 0.0f;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
 // MODELO
-// escala inicial 0.15
-float gscale = 0.10f;
+// escala inicial 0.05
+float gscale = 0.05f;
 // coordenadas iniciais 0.0f, -1.0f, 0.0f
-float gx = 0.0f, gy = -1.0f, gz = 0.0f;
-
-// PONTOS BEZIER CÚBICO
-glm::vec3 gp0 = glm::vec3(0.0f, 0.0f, 0.0f), 
-			gp1 = glm::vec3(0.5f, 0.5f, 0.0f),
-			gp2 = glm::vec3(1.5f, 1.75f, 0.0f),
-			gp3 = glm::vec3(3.0f, 3.0f, 0.0f);
-
-float gt = 0.0f, gtime = 0.0f;
+glm::vec3 pAtual = glm::vec3(0.0f, -1.0f, 0.0f);
 
 int main()
 {
@@ -101,7 +94,6 @@ int main()
     // load models
     // -----------
     Model ourModel(FileSystem::getPath("resources/objects/nanosuit/nanosuit.obj"));
-
     
     // draw in wireframe
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -111,17 +103,14 @@ int main()
     while (!glfwWindowShouldClose(window))
     {
         // per-frame time logic
-        // --------------------
-        float currentFrame = glfwGetTime();
+        currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
         // input
-        // -----
         processInput(window);
 
         // render
-        // ------
         glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -136,47 +125,24 @@ int main()
 
 		// render the loaded model
 		glm::mat4 model;
-		model = glm::translate(model, glm::vec3(gx, gy, gz)); // translate it down so it's at the center of the scene
+		model = glm::translate(model, pAtual); // translate it down so it's at the center of the scene
 		model = glm::scale(model, glm::vec3(gscale));	// it's a bit too big for our scene, so scale it down
-
-		// BOTOES
-		// ESCALA
-		if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
-			escala(model, 1);
-		}
-		if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
-			escala(model, 0);
-		}
-		// TRANSLAÇÂO LINEAR
-		if (glfwGetKey(window, GLFW_KEY_KP_8) == GLFW_PRESS) {
-			translacao(model, 0.0, 0.01, 0.0);
-		}
-		if (glfwGetKey(window, GLFW_KEY_KP_4) == GLFW_PRESS) {
-			translacao(model, -0.01, 0.0, 0.0);
-		}
-		if (glfwGetKey(window, GLFW_KEY_KP_2) == GLFW_PRESS) {
-			translacao(model, 0.0, -0.01, 0.0);
-		}
-		if (glfwGetKey(window, GLFW_KEY_KP_6) == GLFW_PRESS) {
-			translacao(model, 0.01, 0.0, 0.0);
-		}
-		// BEZIER
-		if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS) {
-			gtime = glfwGetTime();
-			gtime = gtime - currentFrame;
-
-			while (gtime <= 10.0) {
-				bezier(model, gp0, gp1, gp2, gp3, gtime * 0.1f);
-
-				gtime = glfwGetTime();
-				gtime = gtime - currentFrame;
-			}
-		}
-
 
         ourShader.setMat4("model", model);
         ourModel.Draw(ourShader);
 
+		// ESCALA
+		if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) {
+			escala(ourShader, ourModel, window, 1.0f);
+		}
+		// TRANSLAÇÂO LINEAR EIXO X
+		if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS) {
+			translacao(ourShader, ourModel, window, 5.0f);
+		}
+		// BEZIER QUADRÁTICO
+		if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS) {
+			bezier(ourShader, ourModel, window, 5.0f, pAtual, glm::vec3(1.0f, 0.5f, 0.0f), glm::vec3(1.5f, 1.5f, 0.0f));
+		}
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
@@ -191,46 +157,116 @@ int main()
 }
 
 // bezier
-void bezier(glm::mat4 model, glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, float t) {
-	float x, y;
+void bezier(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p0, glm::vec3 p1, glm::vec3 p2) {
+	// per-frame time logic
+	float inicio = glfwGetTime();
+	currentFrame = glfwGetTime();
+	deltaTime = currentFrame - inicio;
+	float t = (float) deltaTime / tempo;
 
-	printf("t: %f\n", t);
+	while (deltaTime <= tempo) {
+		// render
+		glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	x = pow(1 - t, 3) * p0.x +
-		pow(1 - t, 2) * 3 * t * p1.x +
-		(1 - t) * 3 * t * t * p2.x +
-		t * t * t * p3.x;
+		// don't forget to enable shader before setting uniforms
+		s.use();
 
-	printf("x: %f\n", x);
+		printf("t: %f\n", t);
 
-	y = pow(1 - t, 3) * p0.y +
-		pow(1 - t, 2) * 3 * t * p1.y +
-		(1 - t) * 3 * t * t * p2.y +
-		t * t * t * p3.y;
+		pAtual.x = pow(1 - t, 2) * p0.x +
+			(1 - t) * 2 * t * p1.x +
+			t * t * p2.x;
 
-	printf("y: %f\n", y);
+		printf("x: %f\n", pAtual.x);
 
-	model = glm::translate(model, glm::vec3(x, y, gz));
+		pAtual.y = pow(1 - t, 2) * p0.y +
+			(1 - t) * 2 * t * p1.y +
+			t * t * p2.y;
+
+		printf("y: %f\n", pAtual.y);
+
+		glm::mat4 model;
+		model = glm::translate(model, pAtual);
+		model = glm::scale(model, glm::vec3(gscale));
+
+		s.setMat4("model", model);
+		m.Draw(s);
+
+		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+
+		currentFrame = glfwGetTime();
+		deltaTime = currentFrame - inicio;
+		t = deltaTime * 0.1f;
+	}
 }
 
 // translacao linear
-void translacao(glm::mat4 model, float x, float y, float z) {
-	gx = gx + x;
-	gy = gy + y;
-	gz = gz + z;
-	model = glm::translate(model, glm::vec3(gx, gy, gz));
+void translacao(Shader s, Model m, GLFWwindow* window, float tempo) {
+	// per-frame time logic
+	float inicio = glfwGetTime();
+	currentFrame = glfwGetTime();
+	deltaTime = currentFrame - inicio;
+	glm::vec3 pInicial = pAtual;
+
+	while (deltaTime <= tempo) {
+		// render
+		glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		// don't forget to enable shader before setting uniforms
+		s.use();
+
+		pAtual.x = pInicial.x + (float)deltaTime * 0.1;
+
+		glm::mat4 model;
+		model = glm::translate(model, pAtual);
+		model = glm::scale(model, glm::vec3(gscale));
+
+		s.setMat4("model", model);
+		m.Draw(s);
+
+		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+
+		currentFrame = glfwGetTime();
+		deltaTime = currentFrame - inicio;
+	}
 }
 
 // escala
-void escala(glm::mat4 model, int flag) {
-	if (flag == 1) {
-		gscale = gscale + 0.001f;
+void escala(Shader s, Model m, GLFWwindow* window, float tempo) {
+	// per-frame time logic
+	float inicio = glfwGetTime();
+	currentFrame = glfwGetTime();
+	deltaTime = currentFrame - inicio;
+
+	while (deltaTime <= tempo) {
+		// render
+		glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		// don't forget to enable shader before setting uniforms
+		s.use();
+
+		gscale += (float)deltaTime * 0.001;
+
+		glm::mat4 model;
+		model = glm::translate(model, pAtual);
 		model = glm::scale(model, glm::vec3(gscale));
-	}
-	else {
-		if(gscale > 0.0f)
-			gscale = gscale - 0.001f;
-		model = glm::scale(model, glm::vec3(gscale));
+
+		s.setMat4("model", model);
+		m.Draw(s);
+
+		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+
+		currentFrame = glfwGetTime();
+		deltaTime = currentFrame - inicio;
 	}
 }
 
