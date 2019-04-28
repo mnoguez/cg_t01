@@ -25,6 +25,8 @@ void processInput(GLFWwindow *window);
 void escala(Shader s, Model m, GLFWwindow* window, float tempo);
 void translacao(Shader s, Model m, GLFWwindow* window, float tempo);
 void bezier(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p0, glm::vec3 p1, glm::vec3 p2);
+void rotacao(Shader s, Model m, GLFWwindow* window, float tempo);
+void rotacaoPonto(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -45,7 +47,6 @@ float lastFrame = 0.0f;
 int modeloAtual = 0;
 // escala inicial 0.05
 glm::vec3 escalas[N_MODELOS] = { glm::vec3(0.05f), glm::vec3(0.05f), glm::vec3(0.05f) };
-// coordenadas iniciais 0.0f, -1.0f, 0.0f
 glm::vec3 pAtuais[N_MODELOS] = { glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.5f, -1.0f, 0.0f), glm::vec3(-0.5f, -1.0f, 0.0f) };
 
 int main()
@@ -136,6 +137,11 @@ int main()
 			ourModel.Draw(ourShader);
 		}
 
+		// TROCA MODELOS
+		if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) {
+			modeloAtual = (int) ((modeloAtual + 1) % N_MODELOS);
+			Sleep(500.0f);
+		}
 		// ESCALA
 		if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) {
 			escala(ourShader, ourModel, window, 1.0f);
@@ -147,6 +153,14 @@ int main()
 		// BEZIER QUADRÁTICO
 		if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS) {
 			bezier(ourShader, ourModel, window, 5.0f, pAtuais[modeloAtual], glm::vec3(1.0f, 0.5f, 0.0f), glm::vec3(1.5f, 1.5f, 0.0f));
+		}
+		// ROTAÇÃO
+		if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) {
+			rotacao(ourShader, ourModel, window, 5.0f);
+		}
+		// ROTAÇÃO NUM PONTO
+		if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS) {
+			rotacaoPonto(ourShader, ourModel, window, 10.0f, glm::vec3(0.25f, 0.0f, 0.0f));
 		}
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
@@ -161,15 +175,22 @@ int main()
     return 0;
 }
 
-// bezier
-void bezier(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p0, glm::vec3 p1, glm::vec3 p2) {
+// rotacao
+void rotacaoPonto(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p) {
 	// per-frame time logic
 	float inicio = glfwGetTime();
 	currentFrame = glfwGetTime();
 	deltaTime = currentFrame - inicio;
-	float t = (float) deltaTime / tempo;
+	glm::vec3 pInicial = pAtuais[modeloAtual];
+
+	// 5s = 360º
+	// delta = x
+
+	float angulo;
 
 	while (deltaTime <= tempo) {
+		angulo = (float)((deltaTime * 360.f) / tempo);
+
 		// render
 		glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -177,24 +198,18 @@ void bezier(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p0, gl
 		// don't forget to enable shader before setting uniforms
 		s.use();
 
-		printf("t: %f\n", t);
-
-		pAtuais[modeloAtual].x = pow(1 - t, 2) * p0.x +
-			(1 - t) * 2 * t * p1.x +
-			t * t * p2.x;
-
-		printf("x: %f\n", pAtuais[modeloAtual].x);
-
-		pAtuais[modeloAtual].y = pow(1 - t, 2) * p0.y +
-			(1 - t) * 2 * t * p1.y +
-			t * t * p2.y;
-
-		printf("y: %f\n", pAtuais[modeloAtual].y);
-
 		// render the loaded model
 		for (int i = 0; i < N_MODELOS; i++) {
 			glm::mat4 model;
-			model = glm::translate(model, pAtuais[i]); // translate it down so it's at the center of the scene
+			if (i == modeloAtual) {
+				model = glm::translate(model, p);
+				model = glm::rotate(model, glm::radians(angulo), glm::vec3(1.0f, 0.0f, 0.0f));
+				model = glm::rotate(model, glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+				model = glm::rotate(model, glm::radians(0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+				model = glm::translate(model, p);
+			}
+			else
+				model = glm::translate(model, pAtuais[i]);
 			model = glm::scale(model, escalas[i]);	// it's a bit too big for our scene, so scale it down
 
 			s.setMat4("model", model);
@@ -202,6 +217,94 @@ void bezier(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p0, gl
 		}
 
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+
+		currentFrame = glfwGetTime();
+		deltaTime = currentFrame - inicio;
+	}
+}
+
+// rotacao
+void rotacao(Shader s, Model m, GLFWwindow* window, float tempo) {
+	// per-frame time logic
+	float inicio = glfwGetTime();
+	currentFrame = glfwGetTime();
+	deltaTime = currentFrame - inicio;
+	glm::vec3 pInicial = pAtuais[modeloAtual];
+
+	// 5s = 360º
+	// delta = x
+
+	float angulo;
+
+	while (deltaTime <= tempo) {
+		angulo = (float)((deltaTime * 360.f) / tempo);
+
+		// render
+		glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		// don't forget to enable shader before setting uniforms
+		s.use();
+
+		// render the loaded model
+		for (int i = 0; i < N_MODELOS; i++) {
+			glm::mat4 model;
+			model = glm::translate(model, pAtuais[i]);
+			if (i == modeloAtual) {
+				model = glm::rotate(model, glm::radians(0.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+				model = glm::rotate(model, glm::radians(angulo), glm::vec3(0.0f, 1.0f, 0.0f));
+				model = glm::rotate(model, glm::radians(0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+			}
+			model = glm::scale(model, escalas[i]);	// it's a bit too big for our scene, so scale it down
+
+			s.setMat4("model", model);
+			m.Draw(s);
+		}
+
+		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+
+		currentFrame = glfwGetTime();
+		deltaTime = currentFrame - inicio;
+	}
+}
+
+// bezier
+void bezier(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p0, glm::vec3 p1, glm::vec3 p2) {
+	float inicio = glfwGetTime();
+	currentFrame = glfwGetTime();
+	deltaTime = currentFrame - inicio;
+	float t = (float) deltaTime / tempo;
+
+	while (deltaTime <= tempo) {
+		glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		s.use();
+
+		//printf("t: %f\n", t);
+		pAtuais[modeloAtual].x = pow(1 - t, 2) * p0.x +
+			(1 - t) * 2 * t * p1.x +
+			t * t * p2.x;
+		//printf("x: %f\n", pAtuais[modeloAtual].x);
+
+		pAtuais[modeloAtual].y = pow(1 - t, 2) * p0.y +
+			(1 - t) * 2 * t * p1.y +
+			t * t * p2.y;
+		//printf("y: %f\n", pAtuais[modeloAtual].y);
+
+		for (int i = 0; i < N_MODELOS; i++) {
+			glm::mat4 model;
+			model = glm::translate(model, pAtuais[i]);
+			model = glm::scale(model, escalas[i]);
+
+			s.setMat4("model", model);
+			m.Draw(s);
+		}
+
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 
@@ -263,7 +366,7 @@ void escala(Shader s, Model m, GLFWwindow* window, float tempo) {
 		// don't forget to enable shader before setting uniforms
 		s.use();
 
-		escalas[modeloAtual] += (float)deltaTime * 0.001;
+		escalas[modeloAtual] += (float)deltaTime * 0.0001;
 
 		// render the loaded model
 		for (int i = 0; i < N_MODELOS; i++) {
