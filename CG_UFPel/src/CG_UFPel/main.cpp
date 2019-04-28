@@ -14,6 +14,8 @@
 
 #include <cmath>
 
+#define N_MODELOS 3
+
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
@@ -40,10 +42,11 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
 // MODELO
+int modeloAtual = 0;
 // escala inicial 0.05
-float gscale = 0.05f;
+glm::vec3 escalas[N_MODELOS] = { glm::vec3(0.05f), glm::vec3(0.05f), glm::vec3(0.05f) };
 // coordenadas iniciais 0.0f, -1.0f, 0.0f
-glm::vec3 pAtual = glm::vec3(0.0f, -1.0f, 0.0f);
+glm::vec3 pAtuais[N_MODELOS] = { glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.5f, -1.0f, 0.0f), glm::vec3(-0.5f, -1.0f, 0.0f) };
 
 int main()
 {
@@ -124,12 +127,14 @@ int main()
         ourShader.setMat4("view", view);
 
 		// render the loaded model
-		glm::mat4 model;
-		model = glm::translate(model, pAtual); // translate it down so it's at the center of the scene
-		model = glm::scale(model, glm::vec3(gscale));	// it's a bit too big for our scene, so scale it down
+		for (int i = 0; i < N_MODELOS; i++) {
+			glm::mat4 model;
+			model = glm::translate(model, pAtuais[i]); // translate it down so it's at the center of the scene
+			model = glm::scale(model, escalas[i]);	// it's a bit too big for our scene, so scale it down
 
-        ourShader.setMat4("model", model);
-        ourModel.Draw(ourShader);
+			ourShader.setMat4("model", model);
+			ourModel.Draw(ourShader);
+		}
 
 		// ESCALA
 		if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) {
@@ -141,7 +146,7 @@ int main()
 		}
 		// BEZIER QUADRÁTICO
 		if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS) {
-			bezier(ourShader, ourModel, window, 5.0f, pAtual, glm::vec3(1.0f, 0.5f, 0.0f), glm::vec3(1.5f, 1.5f, 0.0f));
+			bezier(ourShader, ourModel, window, 5.0f, pAtuais[modeloAtual], glm::vec3(1.0f, 0.5f, 0.0f), glm::vec3(1.5f, 1.5f, 0.0f));
 		}
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
@@ -174,24 +179,27 @@ void bezier(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p0, gl
 
 		printf("t: %f\n", t);
 
-		pAtual.x = pow(1 - t, 2) * p0.x +
+		pAtuais[modeloAtual].x = pow(1 - t, 2) * p0.x +
 			(1 - t) * 2 * t * p1.x +
 			t * t * p2.x;
 
-		printf("x: %f\n", pAtual.x);
+		printf("x: %f\n", pAtuais[modeloAtual].x);
 
-		pAtual.y = pow(1 - t, 2) * p0.y +
+		pAtuais[modeloAtual].y = pow(1 - t, 2) * p0.y +
 			(1 - t) * 2 * t * p1.y +
 			t * t * p2.y;
 
-		printf("y: %f\n", pAtual.y);
+		printf("y: %f\n", pAtuais[modeloAtual].y);
 
-		glm::mat4 model;
-		model = glm::translate(model, pAtual);
-		model = glm::scale(model, glm::vec3(gscale));
+		// render the loaded model
+		for (int i = 0; i < N_MODELOS; i++) {
+			glm::mat4 model;
+			model = glm::translate(model, pAtuais[i]); // translate it down so it's at the center of the scene
+			model = glm::scale(model, escalas[i]);	// it's a bit too big for our scene, so scale it down
 
-		s.setMat4("model", model);
-		m.Draw(s);
+			s.setMat4("model", model);
+			m.Draw(s);
+		}
 
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		glfwSwapBuffers(window);
@@ -209,7 +217,7 @@ void translacao(Shader s, Model m, GLFWwindow* window, float tempo) {
 	float inicio = glfwGetTime();
 	currentFrame = glfwGetTime();
 	deltaTime = currentFrame - inicio;
-	glm::vec3 pInicial = pAtual;
+	glm::vec3 pInicial = pAtuais[modeloAtual];
 
 	while (deltaTime <= tempo) {
 		// render
@@ -219,14 +227,17 @@ void translacao(Shader s, Model m, GLFWwindow* window, float tempo) {
 		// don't forget to enable shader before setting uniforms
 		s.use();
 
-		pAtual.x = pInicial.x + (float)deltaTime * 0.1;
+		pAtuais[modeloAtual].x = pInicial.x + (float)deltaTime * 0.1;
 
-		glm::mat4 model;
-		model = glm::translate(model, pAtual);
-		model = glm::scale(model, glm::vec3(gscale));
+		// render the loaded model
+		for (int i = 0; i < N_MODELOS; i++) {
+			glm::mat4 model;
+			model = glm::translate(model, pAtuais[i]); // translate it down so it's at the center of the scene
+			model = glm::scale(model, escalas[i]);	// it's a bit too big for our scene, so scale it down
 
-		s.setMat4("model", model);
-		m.Draw(s);
+			s.setMat4("model", model);
+			m.Draw(s);
+		}
 
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		glfwSwapBuffers(window);
@@ -252,14 +263,17 @@ void escala(Shader s, Model m, GLFWwindow* window, float tempo) {
 		// don't forget to enable shader before setting uniforms
 		s.use();
 
-		gscale += (float)deltaTime * 0.001;
+		escalas[modeloAtual] += (float)deltaTime * 0.001;
 
-		glm::mat4 model;
-		model = glm::translate(model, pAtual);
-		model = glm::scale(model, glm::vec3(gscale));
+		// render the loaded model
+		for (int i = 0; i < N_MODELOS; i++) {
+			glm::mat4 model;
+			model = glm::translate(model, pAtuais[i]); // translate it down so it's at the center of the scene
+			model = glm::scale(model, escalas[i]);	// it's a bit too big for our scene, so scale it down
 
-		s.setMat4("model", model);
-		m.Draw(s);
+			s.setMat4("model", model);
+			m.Draw(s);
+		}
 
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		glfwSwapBuffers(window);
