@@ -37,6 +37,7 @@ void bezierCamera(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 
 void rotacaoCamera(Shader s, Model m, GLFWwindow* window, float tempo);
 void rotacaoPontoCamera(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p);
 void zoomCamera(Shader s, Model m, GLFWwindow* window, float tempo);
+void animacaoCamera(Shader s, Model m, GLFWwindow* window, float tempo);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -390,6 +391,39 @@ void escala(Shader s, Model m, GLFWwindow* window, float tempo) {
 }
 
 // FUNÇÕES CAMERA
+// animacao
+void animacaoCamera(Shader s, Model m, GLFWwindow* window, float tempo) {
+	// per-frame time logic
+	int passosRestantes = N_PASSOS_CAMERA;
+	float inicio[N_PASSOS_CAMERA] = { 0.0f, 0.0f, 0.0f, 0.0f };
+	currentFrame = glfwGetTime();
+	inicio[0] = currentFrame;
+	glm::vec3 pInicial = pAtuais[modeloAtual];
+
+	// 1
+	inicio[0] = tempo - (glfwGetTime() - inicio[0]);
+	printf("tempo: %f passos restantes: %d\n", inicio[0], passosRestantes);
+	translacao(s, m, window, (float)(inicio[0] / passosRestantes));
+	passosRestantes--;
+	// 2
+	inicio[1] = tempo - (glfwGetTime() - inicio[0]);
+	printf("tempo: %f %f %f\n", tempo, glfwGetTime(), inicio[0]);
+	printf("tempo: %f passos restantes: %d\n", inicio[1], passosRestantes);
+	bezier(s, m, window, (float)(inicio[1] / passosRestantes), pInicial, glm::vec3(1.0f, 0.5f, 0.0f), glm::vec3(1.5f, 1.5f, 0.0f));
+	passosRestantes--;
+	// 3
+	inicio[2] = tempo - (glfwGetTime() - inicio[0]);
+	printf("tempo: %f %f %f\n", tempo, glfwGetTime(), inicio[0]);
+	printf("tempo: %f passos restantes: %d\n", inicio[2], passosRestantes);
+	rotacao(s, m, window, (float)(inicio[2] / passosRestantes));
+	passosRestantes--;
+	// 4
+	inicio[3] = tempo - (glfwGetTime() - inicio[0]);
+	printf("tempo: %f %f %f\n", tempo, glfwGetTime(), inicio[0]);
+	printf("tempo: %f passos restantes: %d\n", inicio[3], passosRestantes);
+	translacao(s, m, window, (float)(inicio[3] / passosRestantes));
+}
+
 // zoom
 void zoomCamera(Shader s, Model m, GLFWwindow* window, float tempo) {
 	// per-frame time logic
@@ -688,6 +722,9 @@ void processInput(Shader s, Model m, GLFWwindow *window)
 	// ZOOM
 	if (glfwGetKey(window, GLFW_KEY_5) == GLFW_PRESS)
 		zoomCamera(s, m, window, 0.25f);
+	// ANIMAÇÃO
+	if (glfwGetKey(window, GLFW_KEY_6) == GLFW_PRESS)
+		animacaoCamera(s, m, window, 10.0f);
 	// ---------------------------------------------------------------------------------------------
 }
 
