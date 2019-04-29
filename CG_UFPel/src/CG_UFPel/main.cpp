@@ -15,7 +15,7 @@
 #include <cmath>
 
 #define N_MODELOS 3
-#define N_CAMERAS 2
+#define N_CAMERAS 3
 #define N_PASSOS_MODELO 4
 #define N_PASSOS_CAMERA 4
 
@@ -24,13 +24,19 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(Shader s, Model m, GLFWwindow *window);
 
-// funções
+// funções modelo
 void escala(Shader s, Model m, GLFWwindow* window, float tempo);
 void translacao(Shader s, Model m, GLFWwindow* window, float tempo);
 void bezier(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p0, glm::vec3 p1, glm::vec3 p2);
 void rotacao(Shader s, Model m, GLFWwindow* window, float tempo);
 void rotacaoPonto(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p);
 void animacao(Shader s, Model m, GLFWwindow* window, float tempo);
+// funções camera
+void translacaoCamera(Shader s, Model m, GLFWwindow* window, float tempo);
+void bezierCamera(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p0, glm::vec3 p1, glm::vec3 p2);
+void rotacaoCamera(Shader s, Model m, GLFWwindow* window, float tempo);
+void rotacaoPontoCamera(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p);
+void zoomCamera(Shader s, Model m, GLFWwindow* window, float tempo);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -38,7 +44,7 @@ const unsigned int SCR_HEIGHT = 600;
 
 // camera
 int cameraAtual = 0;
-Camera camera[N_CAMERAS] = { glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.75f, 0.25f, 5.0f) };
+Camera camera[N_CAMERAS] = { glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.75f, 0.25f, 5.0f), glm::vec3(-0.25f, 0.5f, 4.0f) };
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -383,6 +389,244 @@ void escala(Shader s, Model m, GLFWwindow* window, float tempo) {
 	}
 }
 
+// FUNÇÕES CAMERA
+// zoom
+void zoomCamera(Shader s, Model m, GLFWwindow* window, float tempo) {
+	// per-frame time logic
+	float inicio = glfwGetTime();
+	currentFrame = glfwGetTime();
+	deltaTime = currentFrame - inicio;
+
+	float yoffset;
+
+	while (deltaTime <= tempo) {
+		yoffset = (float)((deltaTime * 5.0f) / tempo);
+
+		// render
+		glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		// don't forget to enable shader before setting uniforms
+		s.use();
+
+		if (camera[cameraAtual].Zoom >= 1.0f && camera[cameraAtual].Zoom <= 45.0f)
+			camera[cameraAtual].Zoom -= yoffset;
+		if (camera[cameraAtual].Zoom <= 1.0f)
+			camera[cameraAtual].Zoom = 1.0f;
+		if (camera[cameraAtual].Zoom >= 45.0f)
+			camera[cameraAtual].Zoom = 45.0f;
+
+		// view/projection transformations
+		glm::mat4 projection = glm::perspective(glm::radians(camera[cameraAtual].Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+		glm::mat4 view = camera[cameraAtual].GetViewMatrix();
+		s.setMat4("projection", projection);
+		s.setMat4("view", view);
+
+		// render the loaded model
+		for (int i = 0; i < N_MODELOS; i++) {
+			glm::mat4 model;
+			model = glm::translate(model, pAtuais[i]);
+			model = glm::scale(model, escalas[i]);	// it's a bit too big for our scene, so scale it down
+
+			s.setMat4("model", model);
+			m.Draw(s);
+		}
+
+		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+
+		currentFrame = glfwGetTime();
+		deltaTime = currentFrame - inicio;
+	}
+}
+
+// rotacao num ponto
+void rotacaoPontoCamera(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p) {
+	// per-frame time logic
+	float inicio = glfwGetTime();
+	currentFrame = glfwGetTime();
+	deltaTime = currentFrame - inicio;
+
+	float angulo;
+
+	while (deltaTime <= tempo) {
+		angulo = (float)((deltaTime * 360.f) / tempo);
+
+		// render
+		glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		// don't forget to enable shader before setting uniforms
+		s.use();
+
+		camera[cameraAtual].Position = p;
+
+		// view/projection transformations
+		glm::mat4 projection = glm::perspective(glm::radians(camera[cameraAtual].Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+		glm::mat4 view = camera[cameraAtual].GetViewMatrix();
+		view = glm::rotate(view, glm::radians(0.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+		view = glm::rotate(view, glm::radians(angulo), glm::vec3(0.0f, 1.0f, 0.0f));
+		view = glm::rotate(view, glm::radians(0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+		s.setMat4("projection", projection);
+		s.setMat4("view", view);
+
+		// render the loaded model
+		for (int i = 0; i < N_MODELOS; i++) {
+			glm::mat4 model;
+			model = glm::translate(model, pAtuais[i]);
+			model = glm::scale(model, escalas[i]);	// it's a bit too big for our scene, so scale it down
+
+			s.setMat4("model", model);
+			m.Draw(s);
+		}
+
+		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+
+		currentFrame = glfwGetTime();
+		deltaTime = currentFrame - inicio;
+	}
+}
+
+// rotacao
+void rotacaoCamera(Shader s, Model m, GLFWwindow* window, float tempo) {
+	// per-frame time logic
+	float inicio = glfwGetTime();
+	currentFrame = glfwGetTime();
+	deltaTime = currentFrame - inicio;
+
+	float angulo;
+
+	while (deltaTime <= tempo) {
+		angulo = (float)((deltaTime * 360.f) / tempo);
+
+		// render
+		glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		// don't forget to enable shader before setting uniforms
+		s.use();
+
+		// view/projection transformations
+		glm::mat4 projection = glm::perspective(glm::radians(camera[cameraAtual].Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+		glm::mat4 view = camera[cameraAtual].GetViewMatrix();
+		view = glm::rotate(view, glm::radians(0.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+		view = glm::rotate(view, glm::radians(angulo), glm::vec3(0.0f, 1.0f, 0.0f));
+		view = glm::rotate(view, glm::radians(0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+		s.setMat4("projection", projection);
+		s.setMat4("view", view);
+
+		// render the loaded model
+		for (int i = 0; i < N_MODELOS; i++) {
+			glm::mat4 model;
+			model = glm::translate(model, pAtuais[i]);
+			model = glm::scale(model, escalas[i]);	// it's a bit too big for our scene, so scale it down
+
+			s.setMat4("model", model);
+			m.Draw(s);
+		}
+
+		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+
+		currentFrame = glfwGetTime();
+		deltaTime = currentFrame - inicio;
+	}
+}
+
+// bezier
+void bezierCamera(Shader s, Model m, GLFWwindow* window, float tempo, glm::vec3 p0, glm::vec3 p1, glm::vec3 p2) {
+	float inicio = glfwGetTime();
+	currentFrame = glfwGetTime();
+	deltaTime = currentFrame - inicio;
+	float t = (float)deltaTime / tempo;
+
+	while (deltaTime <= tempo) {
+		glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		s.use();
+
+		printf("t: %f\n", t);
+		camera[cameraAtual].Position.x = pow(1 - t, 2) * p0.x +
+			(1 - t) * 2 * t * p1.x +
+			t * t * p2.x;
+		printf("x: %f\n", camera[cameraAtual].Position.x);
+
+		camera[cameraAtual].Position.y = pow(1 - t, 2) * p0.y +
+			(1 - t) * 2 * t * p1.y +
+			t * t * p2.y;
+		printf("y: %f\n", camera[cameraAtual].Position.y);
+
+		// view/projection transformations
+		glm::mat4 projection = glm::perspective(glm::radians(camera[cameraAtual].Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+		glm::mat4 view = camera[cameraAtual].GetViewMatrix();
+		s.setMat4("projection", projection);
+		s.setMat4("view", view);
+
+		for (int i = 0; i < N_MODELOS; i++) {
+			glm::mat4 model;
+			model = glm::translate(model, pAtuais[i]);
+			model = glm::scale(model, escalas[i]);
+
+			s.setMat4("model", model);
+			m.Draw(s);
+		}
+
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+
+		currentFrame = glfwGetTime();
+		deltaTime = currentFrame - inicio;
+		t = deltaTime * 0.1f;
+	}
+}
+
+// translacao linear camera
+void translacaoCamera(Shader s, Model m, GLFWwindow* window, float tempo) {
+	// per-frame time logic
+	float inicio = glfwGetTime();
+	currentFrame = glfwGetTime();
+	deltaTime = currentFrame - inicio;
+
+	while (deltaTime <= tempo) {
+		// render
+		glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		// don't forget to enable shader before setting uniforms
+		s.use();
+
+		camera[cameraAtual].Position.x += (float)deltaTime * 0.01;
+
+		// view/projection transformations
+		glm::mat4 projection = glm::perspective(glm::radians(camera[cameraAtual].Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+		glm::mat4 view = camera[cameraAtual].GetViewMatrix();
+		s.setMat4("projection", projection);
+		s.setMat4("view", view);
+
+		// render the loaded model
+		for (int i = 0; i < N_MODELOS; i++) {
+			glm::mat4 model;
+			model = glm::translate(model, pAtuais[i]); // translate it down so it's at the center of the scene
+			model = glm::scale(model, escalas[i]);	// it's a bit too big for our scene, so scale it down
+
+			s.setMat4("model", model);
+			m.Draw(s);
+		}
+
+		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+
+		currentFrame = glfwGetTime();
+		deltaTime = currentFrame - inicio;
+	}
+}
+
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
 void processInput(Shader s, Model m, GLFWwindow *window)
@@ -408,12 +652,7 @@ void processInput(Shader s, Model m, GLFWwindow *window)
 		cameraAtual = (int)((cameraAtual + 1) % N_CAMERAS);
 		Sleep(500.0f);
 	}
-	// ANIMAÇÃO
-	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-		animacao(s, m, window, 10.0f);
-	// ESCALA
-	if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
-		escala(s, m, window, 1.0f);
+	// MODELOS
 	// TRANSLAÇÃO LINEAR EIXO X
 	if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS)
 		translacao(s, m, window, 5.0f);
@@ -426,6 +665,30 @@ void processInput(Shader s, Model m, GLFWwindow *window)
 	// ROTAÇÃO NUM PONTO
 	if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS)
 		rotacaoPonto(s, m, window, 10.0f, glm::vec3(0.25f, 0.0f, 0.0f));
+	// ESCALA
+	if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+		escala(s, m, window, 1.0f);
+	// ANIMAÇÃO
+	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+		animacao(s, m, window, 10.0f);
+	// ---------------------------------------------------------------------------------------------
+	// CAMERAS
+	// TRANSLAÇÃO LINEAR EIXO X
+	if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS)
+		translacaoCamera(s, m, window, 2.0f);
+	// BEZIER QUADRÁTICO
+	if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS)
+		bezierCamera(s, m, window, 5.0f, camera[cameraAtual].Position, glm::vec3(1.0f, 0.5f, 0.0f), glm::vec3(1.5f, 1.5f, 0.0f));
+	// ROTAÇÃO
+	if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS)
+		rotacaoCamera(s, m, window, 5.0f);
+	// ROTAÇÃO NUM PONTO
+	if (glfwGetKey(window, GLFW_KEY_4) == GLFW_PRESS)
+		rotacaoPontoCamera(s, m, window, 10.0f, glm::vec3(-0.25f, 0.5f, 4.0f));
+	// ZOOM
+	if (glfwGetKey(window, GLFW_KEY_5) == GLFW_PRESS)
+		zoomCamera(s, m, window, 0.25f);
+	// ---------------------------------------------------------------------------------------------
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
